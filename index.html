@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>凌音的五度圈 (大师殿堂版)</title>
+    
+    <script src="js/vexflow.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #1e2127;
+            --panel-color: #282c34;
+            --accent-color: #61afef;
+            --text-color: #abb2bf;
+            --subtle-text-color: #8e9a9f;
+            --border-color: #3f444f;
+            --red: #e06c75; --orange: #d19a66; --yellow: #e5c07b; --green: #98c379;
+            --cyan: #56b6c2; --blue: #61afef; --purple: #c678dd; --magenta: #be5046;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .main-container {
+            display: flex;
+            gap: 40px;
+            width: 100%;
+            max-width: 1600px;
+        }
+        .circle-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            position: sticky;
+            top: 20px;
+        }
+        h1 {
+            font-weight: 300;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--accent-color);
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .circle-svg-wrapper {
+            position: relative;
+            width: 600px;
+            height: 600px;
+        }
+        .circle-svg {
+            width: 100%;
+            height: 100%;
+        }
+        .circle-segment {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            cursor: pointer;
+            stroke: var(--bg-color);
+            stroke-width: 2px;
+        }
+        .circle-segment:hover {
+            opacity: 0.85;
+            transform: scale(1.02);
+            transform-origin: center;
+        }
+        .key-text {
+            font-family: inherit;
+            font-weight: bold;
+            fill: rgba(0,0,0,0.7);
+            pointer-events: none;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .major-text { font-size: 26px; }
+        .minor-text { font-size: 16px; opacity: 0.9; }
+        .center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 140px;
+            height: 140px;
+            background: var(--bg-color);
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            font-size: 20px;
+            line-height: 1.2;
+            color: var(--subtle-text-color);
+        }
+        /* *** 关键修正 1：外圈调号样式 *** */
+        .key-signature-container {
+            position: absolute;
+            width: 120px;
+            height: 80px;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            overflow: hidden; /* 确保VexFlow内容不会溢出圆角 */
+        }
+        .display-panel {
+            flex-grow: 1;
+            padding: 25px;
+            background-color: var(--panel-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            min-width: 700px;
+        }
+        .display-panel h2 { margin-top: 0; color: var(--accent-color); text-align: center; font-size: 2em; letter-spacing: 1px; }
+        .display-panel h3 { color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 25px; font-weight: 400; }
+        .staff-container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 20px 0;
+            min-height: 120px;
+            color: #333;
+            font-style: italic;
+            /* *** 关键修正 2：移除滑动条 *** */
+            overflow-x: visible; 
+        }
+        @media (max-width: 1300px) {
+            .main-container { flex-direction: column; align-items: center; }
+            .circle-container { position: static; }
+        }
+        @media (max-width: 600px) {
+            .circle-svg-wrapper { width: 90vw; height: 90vw; }
+            .display-panel { min-width: 90vw; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="circle-container">
+            <h1>凌音的五度圈</h1>
+            <div class="circle-svg-wrapper">
+                <svg id="circleOfFifths" class="circle-svg"></svg>
+                <div class="center-text">Circle of<br>Fifths</div>
+            </div>
+        </div>
+        
+        <div id="displayPanel" class="display-panel">
+            <h2 id="key-title">C 大调 / a 小调</h2>
+            <h3>音阶与调号</h3>
+            <div id="scale-staff-container" class="staff-container">请将鼠标悬停在五度圈上...</div>
+            <h3>随机旋律练习</h3>
+            <div id="melody-staff-container" class="staff-container"></div>
+            <h3>随机和弦进行练习</h3>
+            <div id="chord-staff-container" class="staff-container"></div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            const { Renderer, Stave, StaveNote, Voice, Formatter, Annotation, Accidental, KeySignature, Beam } = Vex.Flow;
+            
+            // *** 关键修正 3：数据核心加入简谱 ***
+            const keysData = [
+                { major: 'C', minor: 'Am', keySignature: 'C', color: 'var(--red)', scale: ['c/4', 'd/4', 'e/4', 'f/4', 'g/4', 'a/4', 'b/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['c/4', 'e/4', 'g/4'], ii: ['d/4', 'f/4', 'a/4'], iii: ['e/4', 'g/4', 'b/4'], IV: ['f/4', 'a/4', 'c/5'], V: ['g/4', 'b/4', 'd/5'], vi: ['a/4', 'c/5', 'e/5'], vii: ['b/4', 'd/5', 'f/5'] } },
+                { major: 'G', minor: 'Em', keySignature: 'G', color: 'var(--orange)', scale: ['g/3', 'a/3', 'b/3', 'c/4', 'd/4', 'e/4', 'f#/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['g/3', 'b/3', 'd/4'], ii: ['a/3', 'c/4', 'e/4'], iii: ['b/3', 'd/4', 'f#/4'], IV: ['c/4', 'e/4', 'g/4'], V: ['d/4', 'f#/4', 'a/4'], vi: ['e/4', 'g/4', 'b/4'], vii: ['f#/4', 'a/4', 'c/5'] } },
+                { major: 'D', minor: 'Bm', keySignature: 'D', color: 'var(--yellow)', scale: ['d/4', 'e/4', 'f#/4', 'g/4', 'a/4', 'b/4', 'c#/5'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['d/4', 'f#/4', 'a/4'], ii: ['e/4', 'g/4', 'b/4'], iii: ['f#/4', 'a/4', 'c#/5'], IV: ['g/4', 'b/4', 'd/5'], V: ['a/4', 'c#/5', 'e/5'], vi: ['b/4', 'd/5', 'f#/5'], vii: ['c#/5', 'e/5', 'g/5'] } },
+                { major: 'A', minor: 'F#m', keySignature: 'A', color: '#b5bd68', scale: ['a/3', 'b/3', 'c#/4', 'd/4', 'e/4', 'f#/4', 'g#/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['a/3', 'c#/4', 'e/4'], ii: ['b/3', 'd/4', 'f#/4'], iii: ['c#/4', 'e/4', 'g#/4'], IV: ['d/4', 'f#/4', 'a/4'], V: ['e/4', 'g#/4', 'b/4'], vi: ['f#/4', 'a/4', 'c#/5'], vii: ['g#/4', 'b/4', 'd/5'] } },
+                { major: 'E', minor: 'C#m', keySignature: 'E', color: 'var(--green)', scale: ['e/4', 'f#/4', 'g#/4', 'a/4', 'b/4', 'c#/5', 'd#/5'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['e/4', 'g#/4', 'b/4'], ii: ['f#/4', 'a/4', 'c#/5'], iii: ['g#/4', 'b/4', 'd#/5'], IV: ['a/4', 'c#/5', 'e/5'], V: ['b/4', 'd#/5', 'f#/5'], vi: ['c#/5', 'e/5', 'g#/5'], vii: ['d#/5', 'f#/5', 'a/5'] } },
+                { major: 'B', minor: 'G#m', keySignature: 'B', color: '#8abeb7', scale: ['b/3', 'c#/4', 'd#/4', 'e/4', 'f#/4', 'g#/4', 'a#/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['b/3', 'd#/4', 'f#/4'], ii: ['c#/4', 'e/4', 'g#/4'], iii: ['d#/4', 'f#/4', 'a#/4'], IV: ['e/4', 'g#/4', 'b/4'], V: ['f#/4', 'a#/4', 'c#/5'], vi: ['g#/4', 'b/4', 'd#/5'], vii: ['a#/4', 'c#/5', 'e/5'] } },
+                { major: 'F#', minor: 'D#m', keySignature: 'F#', color: 'var(--cyan)', scale: ['f#/3', 'g#/3', 'a#/3', 'b/3', 'c#/4', 'd#/4', 'e#/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['f#/3', 'a#/3', 'c#/4'], ii: ['g#/3', 'b/3', 'd#/4'], iii: ['a#/3', 'c#/4', 'e#/4'], IV: ['b/3', 'd#/4', 'f#/4'], V: ['c#/4', 'e#/4', 'g#/4'], vi: ['d#/4', 'f#/4', 'a#/4'], vii: ['e#/4', 'g#/4', 'b/4'] } },
+                { major: 'Db', minor: 'Bbm', keySignature: 'Db', color: '#81a2be', scale: ['db/4', 'eb/4', 'f/4', 'gb/4', 'ab/4', 'bb/4', 'c/5'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['db/4', 'f/4', 'ab/4'], ii: ['eb/4', 'gb/4', 'bb/4'], iii: ['f/4', 'ab/4', 'c/5'], IV: ['gb/4', 'bb/4', 'db/5'], V: ['ab/4', 'c/5', 'eb/5'], vi: ['bb/4', 'db/5', 'f/5'], vii: ['c/5', 'eb/5', 'gb/5'] } },
+                { major: 'Ab', minor: 'Fm', keySignature: 'Ab', color: 'var(--blue)', scale: ['ab/3', 'bb/3', 'c/4', 'db/4', 'eb/4', 'f/4', 'g/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['ab/3', 'c/4', 'eb/4'], ii: ['bb/3', 'db/4', 'f/4'], iii: ['c/4', 'eb/4', 'g/4'], IV: ['db/4', 'f/4', 'ab/4'], V: ['eb/4', 'g/4', 'bb/4'], vi: ['f/4', 'ab/4', 'c/5'], vii: ['g/4', 'bb/4', 'db/5'] } },
+                { major: 'Eb', minor: 'Cm', keySignature: 'Eb', color: '#b294bb', scale: ['eb/4', 'f/4', 'g/4', 'ab/4', 'bb/4', 'c/5', 'd/5'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['eb/4', 'g/4', 'bb/4'], ii: ['f/4', 'ab/4', 'c/5'], iii: ['g/4', 'bb/4', 'd/5'], IV: ['ab/4', 'c/5', 'eb/5'], V: ['bb/4', 'd/5', 'f/5'], vi: ['c/5', 'eb/5', 'g/5'], vii: ['d/5', 'f/5', 'ab/5'] } },
+                { major: 'Bb', minor: 'Gm', keySignature: 'Bb', color: 'var(--purple)', scale: ['bb/3', 'c/4', 'd/4', 'eb/4', 'f/4', 'g/4', 'a/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['bb/3', 'd/4', 'f/4'], ii: ['c/4', 'eb/4', 'g/4'], iii: ['d/4', 'f/4', 'a/4'], IV: ['eb/4', 'g/4', 'bb/4'], V: ['f/4', 'a/4', 'c/5'], vi: ['g/4', 'bb/4', 'd/5'], vii: ['a/4', 'c/5', 'eb/5'] } },
+                { major: 'F', minor: 'Dm', keySignature: 'F', color: 'var(--magenta)', scale: ['f/3', 'g/3', 'a/3', 'bb/3', 'c/4', 'd/4', 'e/4'], jianpu: ['1', '2', '3', '4', '5', '6', '7'], chords: { I: ['f/3', 'a/3', 'c/4'], ii: ['g/3', 'bb/3', 'd/4'], iii: ['a/3', 'c/4', 'e/4'], IV: ['bb/3', 'd/4', 'f/4'], V: ['c/4', 'e/4', 'g/4'], vi: ['d/4', 'f/4', 'a/4'], vii: ['e/4', 'g/4', 'bb/4'] } },
+            ];
+
+            const circleSVG = document.getElementById('circleOfFifths');
+            const circleWrapper = document.querySelector('.circle-svg-wrapper');
+            const keyTitleElement = document.getElementById('key-title');
+            const scaleStaffContainer = document.getElementById('scale-staff-container');
+            const melodyStaffContainer = document.getElementById('melody-staff-container');
+            const chordStaffContainer = document.getElementById('chord-staff-container');
+            
+            function generateCircle() {
+                const size = circleSVG.clientWidth;
+                const center = size / 2;
+                const majorOuterRadius = center * 0.75;
+                const majorInnerRadius = center * 0.5;
+                const minorOuterRadius = majorInnerRadius;
+                const minorInnerRadius = center * 0.25;
+                const sigContainerRadius = center * 0.88;
+
+                const getSegmentPath = (center, startAngle, endAngle, outerRadius, innerRadius = 0) => {
+                    const startOuter = { x: center + outerRadius * Math.cos(startAngle), y: center + outerRadius * Math.sin(startAngle) };
+                    const endOuter = { x: center + outerRadius * Math.cos(endAngle), y: center + outerRadius * Math.sin(endAngle) };
+                    const startInner = { x: center + innerRadius * Math.cos(startAngle), y: center + innerRadius * Math.sin(startAngle) };
+                    const endInner = { x: center + innerRadius * Math.cos(endAngle), y: center + innerRadius * Math.sin(endAngle) };
+                    return `M ${startInner.x} ${startInner.y} L ${startOuter.x} ${startOuter.y} A ${outerRadius} ${outerRadius} 0 0 1 ${endOuter.x} ${endOuter.y} L ${endInner.x} ${endInner.y} A ${innerRadius} ${innerRadius} 0 0 0 ${startInner.x} ${startInner.y} Z`;
+                };
+
+                keysData.forEach((key, i) => {
+                    const angleSlice = (2 * Math.PI) / 12;
+                    const startAngle = (i - 0.5) * angleSlice - (Math.PI / 2);
+                    const endAngle = (i + 0.5) * angleSlice - (Math.PI / 2);
+                    const midAngle = i * angleSlice - (Math.PI / 2);
+
+                    const createPath = (d, fill, className, dataKey) => {
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        path.setAttribute("d", d);
+                        path.setAttribute("fill", fill);
+                        path.setAttribute("class", className);
+                        path.dataset.key = dataKey;
+                        return path;
+                    };
+                    
+                    const createText = (content, radius, className, angle) => {
+                        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        text.setAttribute("x", center + radius * Math.cos(angle));
+                        text.setAttribute("y", center + radius * Math.sin(angle));
+                        text.setAttribute("class", className);
+                        text.textContent = content;
+                        return text;
+                    };
+
+                    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    group.appendChild(createPath(getSegmentPath(center, startAngle, endAngle, majorOuterRadius, majorInnerRadius), key.color, 'circle-segment major-segment', key.major));
+                    group.appendChild(createPath(getSegmentPath(center, startAngle, endAngle, minorOuterRadius, minorInnerRadius), key.color, 'circle-segment minor-segment', key.major));
+                    group.appendChild(createText(key.major, (majorOuterRadius + majorInnerRadius) / 2, 'key-text major-text', midAngle));
+                    group.appendChild(createText(key.minor, (minorOuterRadius + minorInnerRadius) / 2, 'key-text minor-text', midAngle));
+                    group.style.opacity = '0.8';
+                    circleSVG.appendChild(group);
+
+                    const sigContainer = document.createElement('div');
+                    sigContainer.className = 'key-signature-container';
+                    const sigX = center + sigContainerRadius * Math.cos(midAngle);
+                    const sigY = center + sigContainerRadius * Math.sin(midAngle);
+                    const rotation = midAngle * (180 / Math.PI) + 90;
+                    sigContainer.style.transform = `translate(-50%, -50%) translate(${sigX}px, ${sigY}px) rotate(${rotation}deg)`;
+                    
+                    circleWrapper.appendChild(sigContainer);
+                    drawKeySignatureInContainer(sigContainer, key.keySignature);
+                });
+            }
+
+            function drawKeySignatureInContainer(container, keySignature) {
+                try {
+                    const renderer = new Renderer(container, Renderer.Backends.SVG);
+                    renderer.resize(120, 80);
+                    const context = renderer.getContext();
+                    const stave = new Stave(0, 0, 110);
+                    stave.addClef("treble").addKeySignature(keySignature);
+                    stave.setContext(context).draw();
+                } catch(e) { /* silent fail for potential race conditions */ }
+            }
+            
+            function formatNoteName(vexNote) {
+                return vexNote.split('/')[0].replace('b', '♭').replace('#', '♯').toUpperCase();
+            }
+
+            function drawScaleOnStaff(keyData) {
+                scaleStaffContainer.innerHTML = '';
+                const renderer = new Renderer(scaleStaffContainer, Renderer.Backends.SVG);
+                renderer.resize(680, 150);
+                const context = renderer.getContext();
+                const stave = new Stave(10, 20, 660);
+                stave.addClef("treble").addKeySignature(keyData.keySignature);
+                stave.setContext(context).draw();
+                
+                const notes = keyData.scale.map((noteStr, i) => {
+                    const note = new StaveNote({ keys: [noteStr], duration: "q", clef: "treble" });
+                    const noteName = formatNoteName(noteStr);
+                    // *** 关键修正 3：使用简谱 ***
+                    const jianpuName = keyData.jianpu[i];
+                    note.addModifier(new Annotation(noteName).setVerticalJustification(Annotation.VerticalJustify.BOTTOM).setFontSize(12));
+                    note.addModifier(new Annotation(jianpuName).setVerticalJustification(Annotation.VerticalJustify.BOTTOM).setYShift(12).setFontSize(12));
+                    return note;
+                });
+                
+                const voice = new Voice({ num_beats: 7, beat_value: 4 }).addTickables(notes);
+                new Formatter().joinVoices([voice]).format([voice], 600);
+                voice.draw(context, stave);
+            }
+
+            function generateRandomMelody(keyData) {
+                melodyStaffContainer.innerHTML = '生成中...';
+                setTimeout(() => {
+                    melodyStaffContainer.innerHTML = '';
+                    const renderer = new Renderer(melodyStaffContainer, Renderer.Backends.SVG);
+                    const context = renderer.getContext();
+                    const numMeasures = Math.floor(Math.random() * 5) + 8;
+                    // *** 关键修正 2：动态计算谱表宽度 ***
+                    const containerWidth = melodyStaffContainer.clientWidth - 20;
+                    const stavesPerRow = Math.min(4, Math.floor(containerWidth / 200));
+                    const staveWidth = containerWidth / stavesPerRow;
+                    const numRows = Math.ceil(numMeasures / stavesPerRow);
+                    renderer.resize(containerWidth + 20, numRows * 120 + 20);
+
+                    const scale = keyData.scale;
+                    let currentNoteIndex = 3; 
+                    // *** 关键修正 3：优化节奏型，增加呼吸感 ***
+                    const rhythmPatterns = [['h', 'q', 'q'], ['q', 'h', 'q'], ['q', 'q', 'h'], ['q', 'q', 'q', 'q'], ['8', '8', 'q', 'h'], ['h', '8', '8', 'q']];
+                    const ticksPerMeasure = 4 * Vex.Flow.RESOLUTION / 4;
+
+                    for (let i = 0; i < numMeasures; i++) {
+                        const staveX = (i % stavesPerRow) * staveWidth + 10;
+                        const staveY = Math.floor(i / stavesPerRow) * 120 + 20;
+                        const stave = new Stave(staveX, staveY, staveWidth - (i % stavesPerRow === stavesPerRow - 1 ? 10 : 0) );
+                        if (i === 0) stave.addClef("treble").addTimeSignature("4/4").addKeySignature(keyData.keySignature);
+                        stave.setContext(context).draw();
+
+                        let measureNotes = [];
+                        let measureTicks = 0;
+                        
+                        while(measureTicks < ticksPerMeasure) {
+                            const patternIndex = Math.floor(Math.random() * rhythmPatterns.length);
+                            const pattern = rhythmPatterns[patternIndex];
+                            
+                            for (const duration of pattern) {
+                                const tickValue = Vex.Flow.durationToTicks(duration);
+                                if (measureTicks + tickValue > ticksPerMeasure) continue;
+
+                                const step = Math.random() > 0.5 ? 1 : -1;
+                                currentNoteIndex += Math.random() > 0.3 ? step : 0;
+                                currentNoteIndex = Math.max(0, Math.min(scale.length - 1, currentNoteIndex));
+                                const noteIndex = Math.floor(currentNoteIndex);
+                                
+                                let [pitch, octave] = scale[noteIndex].split('/');
+                                measureNotes.push(new StaveNote({ keys: [`${pitch}/${octave}`], duration: duration, clef: "treble" }));
+                                measureTicks += tickValue;
+                                if (measureTicks >= ticksPerMeasure) break;
+                            }
+                        }
+                        
+                        const voice = new Voice({ num_beats: 4, beat_value: 4 }).addTickables(measureNotes);
+                        const beams = Beam.generateBeams(voice.getTickables());
+                        // *** 关键修正 2：给予更宽裕的排版空间 ***
+                        new Formatter().joinVoices([voice]).format([voice], staveWidth - 40);
+                        voice.draw(context, stave);
+                        beams.forEach(b => b.setContext(context).draw());
+                    }
+                }, 10);
+            }
+            
+            function generateRandomChordProgression(keyData) {
+                chordStaffContainer.innerHTML = '生成中...';
+                setTimeout(() => {
+                    chordStaffContainer.innerHTML = '';
+                    const renderer = new Renderer(chordStaffContainer, Renderer.Backends.SVG);
+                    const context = renderer.getContext();
+                    const numMeasures = Math.floor(Math.random() * 5) + 8;
+                    const containerWidth = chordStaffContainer.clientWidth - 20;
+                    const stavesPerRow = Math.min(4, Math.floor(containerWidth / 200));
+                    const staveWidth = containerWidth / stavesPerRow;
+                    const numRows = Math.ceil(numMeasures / stavesPerRow);
+                    renderer.resize(containerWidth + 20, numRows * 120 + 20);
+
+                    const progression = ['I'];
+                    const rules = { 'I': ['ii', 'iii', 'IV', 'V', 'vi'], 'ii': ['V', 'vii'], 'iii': ['IV', 'vi'], 'IV': ['V', 'ii', 'I'], 'V': ['I', 'vi'], 'vi': ['ii', 'IV'], 'vii': ['I', 'iii'] };
+                    for (let i = 1; i < numMeasures; i++) {
+                        const lastChord = progression[i-1];
+                        const possibleNext = rules[lastChord] || ['I'];
+                        progression.push(possibleNext[Math.floor(Math.random() * possibleNext.length)]);
+                    }
+                    
+                    for (let i = 0; i < numMeasures; i++) {
+                        const staveX = (i % stavesPerRow) * staveWidth + 10;
+                        const staveY = Math.floor(i / stavesPerRow) * 120 + 20;
+                        const stave = new Stave(staveX, staveY, staveWidth - (i % stavesPerRow === stavesPerRow - 1 ? 10 : 0));
+                        if (i === 0) stave.addClef("treble").addTimeSignature("4/4").addKeySignature(keyData.keySignature);
+                        stave.setContext(context).draw();
+
+                        const chordSymbol = progression[i];
+                        const note = new StaveNote({ keys: keyData.chords[chordSymbol], duration: 'w', clef: "treble" });
+                        note.addModifier(new Annotation(chordSymbol).setVerticalJustification(Annotation.VerticalJustify.BOTTOM).setFontSize(14));
+                        
+                        const voice = new Voice({ num_beats: 4, beat_value: 4 }).addTickables([note]);
+                        new Formatter().joinVoices([voice]).format([voice], staveWidth - 40);
+                        voice.draw(context, stave);
+                    }
+                }, 10);
+            }
+
+            function updateDisplayOnHover(selectedKey) {
+                const keyData = keysData.find(k => k.major === selectedKey);
+                keyTitleElement.innerText = `${keyData.major} 大调 / ${keyData.minor} 小调`;
+                drawScaleOnStaff(keyData);
+                generateRandomMelody(keyData);
+                generateRandomChordProgression(keyData);
+            }
+
+            function handleKeyHover(event) {
+                const targetKey = event.target.closest('.circle-segment');
+                if (!targetKey) return;
+                const selectedKeyName = targetKey.dataset.key;
+                
+                document.querySelectorAll('.circle-segment').forEach(seg => seg.parentElement.style.opacity = '0.8');
+                document.querySelectorAll(`[data-key="${selectedKeyName}"]`).forEach(seg => seg.parentElement.style.opacity = '1');
+                
+                updateDisplayOnHover(selectedKeyName);
+            }
+            
+            generateCircle();
+            circleSVG.addEventListener('mouseover', handleKeyHover);
+            
+            const cKeyData = keysData[0];
+            updateDisplayOnHover(cKeyData.major);
+            document.querySelectorAll(`[data-key="${cKeyData.major}"]`).forEach(seg => seg.parentElement.style.opacity = '1');
+        };
+    </script>
+</body>
+</html>
